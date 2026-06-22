@@ -7,4 +7,4 @@ celery==5.3.4
 redis==5.0.1
 ffmpeg-python==0.2.0
 python-multipart==0.0.6
-Pillow==10.1.0
+Pillow==12.2.0

@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: lottie_user
+      POSTGRES_PASSWORD: securepassword
+      POSTGRES_DB: lottie_db
+    ports:
+      - "5431:5432"  # Host gets 5431, Container stays 5432
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lottie_user -d lottie_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"  # Host gets 6380 (fixes your conflict), Container stays 6379
+
+  api:
+    build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    volumes:
+      - ./app:/app/app
+      - ./storage:/storage
+    ports:
+      - "8001:8000"  # Host gets 8001, routes to Uvicorn running on 8000
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  worker:
+    build: .
+    command: celery -A app.worker.celery_app worker --loglevel=info
+    volumes:
+      - ./app:/app/app
+      - ./storage:/storage
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started

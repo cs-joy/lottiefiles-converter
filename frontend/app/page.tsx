@@ -16,6 +16,7 @@ export default function Home() {
   const [lottieUrl, setLottieUrl] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [lottieData, setLottieData] = useState<any>(null); // Holds the actual JSON object
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   
   // Notice we use port 8001 based on our docker-compose host mapping
   const API_BASE = "https://saddling-reunion-riveting.ngrok-free.dev";
@@ -107,11 +108,29 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [jobId, status]);
 
+  useEffect(() => {
+    if (!lottieData) return;
+
+    const audioAsset = lottieData.assets?.find((asset: { t?: number }) => asset.t === 2);
+    if (!audioAsset?.p) return;
+
+    const audio = new Audio(audioAsset.p);
+    audio.loop = true;
+    audioRef.current = audio;
+    audio.play().catch(() => {});
+
+    return () => {
+      audio.pause();
+      audio.src = "";
+      audioRef.current = null;
+    };
+  }, [lottieData]);
+
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col items-center py-20 px-4 text-gray-900">
       <div className="w-full max-w-2xl bg-white rounded-xl shadow-xl p-8">
         <h1 className="text-3xl font-bold mb-2 text-center">Video to Lottie Converter</h1>
-        <p className="text-gray-500 text-center mb-8">Upload a short video (under 1.6MB target limit)</p>
+        <p className="text-gray-500 text-center mb-8">Upload a short video (under 1.95MB target limit, audio included)</p>
 
         {/* Upload Section */}
         <div className="border-2 border-dashed border-gray-300 rounded-lg p-10 flex flex-col items-center justify-center mb-6 bg-gray-50 hover:bg-gray-100 transition">
@@ -135,7 +154,7 @@ export default function Home() {
           <div className="text-center p-6 bg-blue-50 rounded-lg border border-blue-100">
             <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4"></div>
             <p className="text-blue-800 font-medium">Processing your video...</p>
-            <p className="text-sm text-blue-600 mt-1">Extracting frames and compressing to WebP vectors.</p>
+            <p className="text-sm text-blue-600 mt-1">Extracting frames, audio, and compressing to WebP.</p>
           </div>
         )}
 

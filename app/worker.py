@@ -19,57 +19,6 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 MAX_JSON_SIZE = int(1.95 * 1024 * 1024)  # 1.95 MB
 JSON_OVERHEAD = 25000
 BASE64_FACTOR = 4 / 3
-MAX_AUDIO_RAW_BYTES = 220_000
-AUDIO_BITRATES = ["96k", "64k", "48k", "32k", "24k"]
-
-
-def _has_audio_stream(probe):
-    return any(s.get("codec_type") == "audio" for s in probe.get("streams", []))
-
-
-def _extract_audio(input_path, temp_dir, max_raw_bytes):
-    audio_path = os.path.join(temp_dir, "audio.mp3")
-    best_encoded = None
-    best_size = None
-
-    for bitrate in AUDIO_BITRATES:
-        try:
-            (
-                ffmpeg
-                .input(input_path)
-                .output(audio_path, acodec="libmp3lame", audio_bitrate=bitrate, vn=None)
-                .overwrite_output()
-                .run(capture_stdout=True, capture_stderr=True)
-            )
-        except ffmpeg.Error:
-            return None
-
-        size = os.path.getsize(audio_path)
-        with open(audio_path, "rb") as audio_file:
-            encoded = base64.b64encode(audio_file.read()).decode("utf-8")
-
-        if size <= max_raw_bytes:
-            return {
-                "id": "audio_0",
-                "t": 2,
-                "e": 1,
-                "u": "",
-                "p": f"data:audio/mpeg;base64,{encoded}",
-            }, size
-
-        best_encoded = encoded
-        best_size = size
-
-    if best_encoded is None:
-        return None
-
-    return {
-        "id": "audio_0",
-        "t": 2,
-        "e": 1,
-        "u": "",
-        "p": f"data:audio/mpeg;base64,{best_encoded}",
-    }, best_size
 
 
 def _compress_frame(img, webp_path, budget_bytes, start_quality=88):
@@ -120,16 +69,8 @@ def process_video_task(self, job_id: str, input_path: str):
             if num_frames == 0:
                 raise Exception("No frames extracted from video")
 
-            audio_asset = None
-            audio_raw_size = 0
-            if _has_audio_stream(probe):
-                audio_result = _extract_audio(input_path, temp_dir, MAX_AUDIO_RAW_BYTES)
-                if audio_result:
-                    audio_asset, audio_raw_size = audio_result
-
-            audio_json_bytes = int(audio_raw_size * BASE64_FACTOR) + 500 if audio_asset else 0
             budget_bytes_per_frame = int(
-                (MAX_JSON_SIZE - JSON_OVERHEAD - audio_json_bytes) / BASE64_FACTOR / num_frames
+                (MAX_JSON_SIZE - JSON_OVERHEAD) / BASE64_FACTOR / num_frames
             )
             if budget_bytes_per_frame < 500:
                 raise Exception("Video is too long to fit within the 1.95MB output limit")
@@ -170,25 +111,6 @@ def process_video_task(self, job_id: str, input_path: str):
                     "ip": idx,
                     "op": idx + 1,
                     "st": idx,
-                    "bm": 0,
-                })
-
-            if audio_asset:
-                assets.append(audio_asset)
-                layers.append({
-                    "ty": 6,
-                    "nm": "Audio",
-                    "refId": audio_asset["id"],
-                    "ks": {
-                        "o": {"a": 0, "k": 100},
-                        "r": {"a": 0, "k": 0},
-                        "p": {"a": 0, "k": [0, 0, 0]},
-                        "a": {"a": 0, "k": [0, 0, 0]},
-                        "s": {"a": 0, "k": [100, 100, 100]},
-                    },
-                    "ip": 0,
-                    "op": num_frames,
-                    "st": 0,
                     "bm": 0,
                 })
 

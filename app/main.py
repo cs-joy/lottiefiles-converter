@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse
 app = FastAPI(title="Video to Lottie API")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000","https://durable-assignment-overall-bracelet.trycloudflare.com"],
+    allow_origins=["http://localhost:3000","https://bacon-unless-ver-lawyers.trycloudflare.com"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
